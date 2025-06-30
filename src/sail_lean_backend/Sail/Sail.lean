@@ -78,7 +78,7 @@ def update (x : BitVec m) (n : Nat) (b : BitVec 1) := updateSubrange' x n _ b
 def updateBE (x : BitVec m) (n : Nat) (b : BitVec 1) := updateSubrange' x (m - n - 1) _ b
 
 def toBin {w : Nat} (x : BitVec w) : String :=
-  List.asString (List.map (fun c => if c then '1' else '0') (List.ofFn (BitVec.getMsb x)))
+  List.asString (List.map (fun c => if c then '1' else '0') (List.ofFn (BitVec.getMsb' x)))
 
 def toFormatted {w : Nat} (x : BitVec w) : String :=
   if (length x % 4) == 0 then
@@ -380,7 +380,7 @@ variable {Register : Type} {RegisterType : Register → Type} [DecidableEq Regis
 structure SequentialState (RegisterType : Register → Type) (c : ChoiceSource) where
   regs : (reg : Register) → (RegisterType reg)
   choiceState : c.α
-  mem : Std.HashMap Nat (BitVec 8)
+  mem : Nat → (BitVec 8)
   tags : Unit
   cycleCount : Nat -- Part of the concurrency interface. See `{get_}cycle_count`
   sailOutput : Array String -- TODO: be able to use the IO monad to run
@@ -460,7 +460,7 @@ def assert (p : Bool) (s : String) : PreSailM RegisterType c ue Unit :=
 section ConcurrencyInterface
 
 def writeByte (addr : Nat) (value : BitVec 8) : PreSailM RegisterType c ue PUnit := do
-  modify fun s => { s with mem := s.mem.insert addr value }
+  modify fun s => { s with mem := Function.update s.mem addr value }
 
 def writeBytes (addr : Nat) (value : BitVec (8 * n)) : PreSailM RegisterType c ue Bool := do
   let list := List.ofFn (λ i : Fin n => (addr + i.val, value.extractLsb' (8 * i.val) 8))
@@ -480,8 +480,7 @@ def write_ram (addr_size data_size : Nat) (_hex_ram addr : BitVec addr_size) (va
   pure ()
 
 def readByte (addr : Nat) : PreSailM RegisterType c ue (BitVec 8) := do
-  let .some s := (← get).mem.get? addr
-    | throw (.OutOfMemoryRange addr)
+  let s := (← get).mem addr
   pure s
 
 def readBytes (size : Nat) (addr : Nat) : PreSailM RegisterType c ue ((BitVec (8 * size)) × Option Bool) :=
