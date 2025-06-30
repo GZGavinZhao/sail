@@ -1,5 +1,6 @@
 import Std.Data.ExtDHashMap
 import Std.Data.HashMap
+import Mathlib.Logic.Function.Basic
 
 namespace Sail
 
@@ -377,7 +378,7 @@ section Regs
 variable {Register : Type} {RegisterType : Register → Type} [DecidableEq Register] [Hashable Register]
 
 structure SequentialState (RegisterType : Register → Type) (c : ChoiceSource) where
-  regs : Std.ExtDHashMap Register RegisterType
+  regs : (reg : Register) → (RegisterType reg)
   choiceState : c.α
   mem : Std.HashMap Nat (BitVec 8)
   tags : Unit
@@ -437,11 +438,10 @@ def internal_pick {α : Type} : List α → PreSailM RegisterType c ue α
     pure <| (a :: as).get idx
 
 def writeReg (r : Register) (v : RegisterType r) : PreSailM RegisterType c ue PUnit :=
-  modify fun s => { s with regs := s.regs.insert r v }
+  modify fun s => { s with regs := Function.update s.regs r v }
 
 def readReg (r : Register) : PreSailM RegisterType c ue (RegisterType r) := do
-  let .some s := (← get).regs.get? r
-    | throw .Unreachable
+  let s := (← get).regs r
   pure s
 
 def readRegRef (reg_ref : @RegisterRef Register RegisterType α) : PreSailM RegisterType c ue α := do
